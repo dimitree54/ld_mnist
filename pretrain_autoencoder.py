@@ -1,37 +1,86 @@
-import numpy as np
 import tensorflow as tf
-from tensorflow.python.keras.callbacks import TensorBoard, ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 
 from models import create_vae
 from plots_drawer import plot_digits, plot_manifold
-
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
-
-x_train = x_train.astype('float32') / 255.
-x_test = x_test.astype('float32') / 255.
-x_train = np.reshape(x_train, (len(x_train), 28, 28, 1))
-x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
-
-models, vae_loss = create_vae()
-vae = models["vae"]
+import mnist
 
 start_lr = 0.0001
 batch_size = 500
-vae.compile(optimizer=Adam(start_lr), loss=vae_loss)
+n_epochs = 1000
 
-# Коллбэки
-lr_red = ReduceLROnPlateau(factor=0.1, patience=25)
-tb = TensorBoard(log_dir='./logs')
 
-# Запуск обучения
-vae.fit(x_train, x_train, shuffle=True, epochs=1000,
-        batch_size=batch_size,
-        validation_data=(x_test, x_test),
-        callbacks=[lr_red, tb],
-        verbose=1)
+def train(train_data, val_data, vae, vae_loss):
+    optimizer = Adam(start_lr)
 
-imgs = x_test[:10]
-decoded = vae.predict(imgs)
-plot_digits(imgs[:10], decoded[:10])
-plot_manifold(models["decoder"])
+    tb_train_writer = tf.summary.create_file_writer("logs/train")
+    tb_val_writer = tf.summary.create_file_writer("logs/val")
+
+    total_loss_metric = tf.metrics.Mean()
+    reconstruction_loss_metric = tf.metrics.Mean()
+    internal_loss_metric = tf.metrics.Mean()
+
+    @tf.function
+    def train_one_epoch():
+        for batch in train_data:
+            x_train = batch["features"]
+            y_train = batch["label"]
+            with tf.GradientTape() as tape:
+                reconstructed_x = vae(x_train)
+                reconstruction_loss = vae_loss(x_train, reconstructed_x)
+                internal_loss = tf.reduce_sum(vae.losses)
+                total_loss = reconstruction_loss + internal_loss
+            grads = tape.gradient(total_loss, vae.trainable_variables)
+            optimizer.apply_gradients(zip(grads, vae.trainable_variables))
+
+
+            total_loss_metric.update_state(total_loss)
+            reconstruction_loss_metric.update_state(reconstruction_loss)
+            internal_loss_metric.update_state(internal_loss)
+        with tb_train_writer.as_default():
+            tf.summary.scalar("total_loss", total_loss_metric.result(), epoch)
+            tf.summary.scalar("reconstruction_loss", reconstruction_loss_metric.result(), epoch)
+            tf.summary.scalar("internal_loss", internal_loss_metric.result(), epoch)
+        total_loss_metric.reset_states()
+        reconstruction_loss_metric.reset_states()
+        internal_loss_metric.reset_states()
+
+        for batch in val_data:
+            x_train = batch["features"]
+            y_train = batch["label"]
+            reconstructed_x = vae(x_train)
+            reconstruction_loss = vae_loss(x_train, reconstructed_x)
+            internal_loss = tf.reduce_sum(vae.losses)
+            total_loss = reconstruction_loss + internal_loss
+
+            total_loss_metric.update_state(total_loss)
+            reconstruction_loss_metric.update_state(reconstruction_loss)
+            internal_loss_metric.update_state(internal_loss)
+        with tb_val_writer.as_default():
+            tf.summary.scalar("total_loss", total_loss_metric.result(), epoch)
+            tf.summary.scalar("reconstruction_loss", reconstruction_loss_metric.result(), epoch)
+            tf.summary.scalar("internal_loss", internal_loss_metric.result(), epoch)
+        total_loss_metric.reset_states()
+        reconstruction_loss_metric.reset_states()
+        internal_loss_metric.reset_states()
+
+    for epoch in range(n_epochs):
+        train_one_epoch()
+
+
+def main():
+    models, vae_loss = create_vae()
+    vae = models["vae"]
+
+    train_data, val_data = mnist.get_data(batch_size)
+
+    train(train_data, val_data, vae, vae_loss)
+
+    images = next(iter(val_data))["features"][:10].numpy()
+    decoded = vae.predict(images)
+    plot_digits(images[:10], decoded[:10])
+    plot_manifold(models["decoder"])
+    input()
+
+
+main()
