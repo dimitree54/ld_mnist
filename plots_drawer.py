@@ -24,7 +24,7 @@ def plot_digits(*args, invert_colors=False, digit_size=28):
     plt.show()
 
 
-def draw_manifold(generator, show=True, digit_size=28, n=10, latent_dim=2):
+def plot_manifold(generator, digit_size=28, n=10, latent_dim=2):
     # Так как сэмплируем из N(0, I), то сетку узлов, в которых генерируем цифры берем из обратной функции распределения
     grid_x = norm.ppf(np.linspace(0.05, 0.95, n))
     grid_y = norm.ppf(np.linspace(0.05, 0.95, n))
@@ -40,13 +40,12 @@ def draw_manifold(generator, show=True, digit_size=28, n=10, latent_dim=2):
             x_decoded = generator.predict(z_sample)
             digit = x_decoded[0].squeeze()
             figure[i * digit_size: (i + 1) * digit_size, j * digit_size: (j + 1) * digit_size] = digit
-    if show:
-        # Визуализация
-        plt.figure(figsize=(15, 15))
-        plt.imshow(figure, cmap='Greys_r')
-        plt.grid(None)
-        ax = plt.gca()
-        ax.get_xaxis().set_visible(False)
-        ax.get_yaxis().set_visible(False)
-        plt.show()
-    return figure
+
+    # Визуализация
+    plt.figure(figsize=(15, 15))
+    plt.imshow(figure, cmap='Greys_r')
+    plt.grid(None)
+    ax = plt.gca()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    plt.show()

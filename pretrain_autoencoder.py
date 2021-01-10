@@ -1,9 +1,10 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras.callbacks import TensorBoard, ReduceLROnPlateau
-from tensorflow.python.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 
 from models import create_vae
+from plots_drawer import plot_digits, plot_manifold
 
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
@@ -29,3 +30,8 @@ vae.fit(x_train, x_train, shuffle=True, epochs=1000,
         validation_data=(x_test, x_test),
         callbacks=[lr_red, tb],
         verbose=1)
+
+imgs = x_test[:10]
+decoded = vae.predict(imgs)
+plot_digits(imgs[:10], decoded[:10])
+plot_manifold(models["decoder"])
