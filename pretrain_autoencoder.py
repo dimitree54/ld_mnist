@@ -2,13 +2,14 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
-from models import create_image_vae, calc_reconstruction_loss
+from models import create_image_vae, calc_reconstruction_loss, create_cnn_vae
 from plots_drawer import plot_digits, plot_manifold
 import mnist
 
 start_lr = 0.0001
 batch_size = 500
 n_epochs = 1000
+latent_dim = 8
 
 tf.config.experimental.set_memory_growth(tf.config.experimental.list_physical_devices('GPU')[0], True)
 
@@ -42,8 +43,8 @@ def train(train_data, val_data, vae):
     lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 25, 0.1)
     optimizer = Adam(lr_schedule.get_lr)
 
-    tb_train_writer = tf.summary.create_file_writer("logs/train")
-    tb_val_writer = tf.summary.create_file_writer("logs/val")
+    tb_train_writer = tf.summary.create_file_writer("logs_cnn/train")
+    tb_val_writer = tf.summary.create_file_writer("logs_cnn/val")
 
     total_loss_metric = tf.metrics.Mean()
     reconstruction_loss_metric = tf.metrics.Mean()
@@ -105,7 +106,7 @@ def train(train_data, val_data, vae):
 
 
 def main():
-    models = create_image_vae()
+    models = create_cnn_vae(latent_dim=latent_dim)
     vae = models["vae"]
 
     train_data, val_data = mnist.get_data(batch_size)
@@ -115,7 +116,7 @@ def main():
     images = next(iter(val_data))["features"][:10].numpy()
     decoded = vae.predict(images)
     plot_digits(images[:10], decoded[:10])
-    plot_manifold(models["decoder"])
+    plot_manifold(models["decoder"], latent_dim=latent_dim)
     input()
 
 
