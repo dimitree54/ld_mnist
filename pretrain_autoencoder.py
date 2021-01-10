@@ -120,4 +120,21 @@ def main():
     input()
 
 
+def main_with_class():
+    image_vae_models = create_cnn_vae(latent_dim=latent_dim)
+    middle_cayers = create_middle_layers(latent_dim=latent_dim)
+    class_vae_models = create_class_vae(latent_dim=latent_dim)
+    vae = models["vae"]
+
+    train_data, val_data = mnist.get_data(batch_size)
+
+    train(train_data, val_data, vae)
+
+    images = next(iter(val_data))["features"][:10].numpy()
+    decoded = vae.predict(images)
+    plot_digits(images[:10], decoded[:10])
+    plot_manifold(models["decoder"], latent_dim=latent_dim)
+    input()
+
+
 main()

@@ -111,19 +111,24 @@ def create_cnn_vae(dropout_rate=0.3, latent_dim=2):
 
 
 def create_middle_layers(dropout_rate=0.3, latent_dim=2):
-    pass
+    z = Input(shape=(latent_dim,))
+    x = Dense(latent_dim)(z)
+    x = LeakyReLU()(x)
+    x = BatchNormalization()(x)
+    x = Dropout(dropout_rate)(x)
+    x = Dense(latent_dim)(x)
+    x = LeakyReLU()(x)
+    x = BatchNormalization()(x)
+    x = Dropout(dropout_rate)(x)
+    x = Dense(latent_dim)(x)
+    return Model(z, x, name="MiddleLayers")
 
 
 def create_class_vae(dropout_rate=0.3, latent_dim=2):
     vae_models = {}
 
     input_class = Input(shape=(10,))
-    x = Dense(32, activation='relu')(input_class)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
-    x = Dense(64, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
+    x = input_class
 
     z_mean = Dense(latent_dim)(x)
     z_log_var = Dense(latent_dim)(x)
@@ -131,15 +136,7 @@ def create_class_vae(dropout_rate=0.3, latent_dim=2):
     latent_code = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var, latent_dim])
 
     z = Input(shape=(latent_dim,))
-    x = Dense(64)(z)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
-    x = Dense(32)(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
-    decoded = Dense(latent_dim, activation='softmax')(x)
+    decoded = Dense(latent_dim, activation='softmax')(z)
 
     vae_models["encoder"] = Model(input_class, latent_code, name='Encoder')
     vae_models["decoder"] = Model(z, decoded, name='Decoder')
