@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow.python.keras import Input, Model
-from tensorflow.python.keras.layers import Dropout, BatchNormalization, Dense, Flatten, Lambda, LeakyReLU, Reshape, \
-    ReLU, MaxPool2D, Conv2D, UpSampling2D
+from tensorflow.python.keras.layers import Dropout, BatchNormalization, Dense, Flatten, Lambda, LeakyReLU, Reshape
 from tensorflow.python.keras.losses import binary_crossentropy
 
 
@@ -51,7 +50,7 @@ def create_image_vae(dropout_rate=0.3, latent_dim=2):
     vae_models['vae'] = Model(input_img, vae_models['decoder'](latent_code), name='vae')
 
     kl_loss = -0.5 * tf.reduce_sum(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=-1) / 2 / 28 / 28
-    vae_models["vae"].add_loss(tf.reduce_mean(kl_loss))
+    vae_models["encoder"].add_loss(tf.reduce_mean(kl_loss))
 
     return vae_models
 
@@ -89,7 +88,6 @@ def create_class_vae(dropout_rate=0.3, latent_dim=2):
     vae_models["vae"] = Model(input_class, vae_models["decoder"](latent_code), name="VAE")
 
     kl_loss = -0.5 * tf.reduce_sum(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=-1)
-    vae_models["vae"].add_loss(tf.reduce_sum(kl_loss))
-    vae_models["encoder"].add_loss(tf.reduce_sum(kl_loss))
+    vae_models["encoder"].add_loss(tf.reduce_mean(kl_loss))
 
     return vae_models
