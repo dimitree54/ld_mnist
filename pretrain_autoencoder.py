@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 import os
+import numpy as np
 
 from misc import LRScheduleWithReduceOnPlato
 from models import create_image_vae, calc_reconstruction_loss, create_middle_layers, create_class_vae
@@ -12,17 +13,24 @@ start_lr = 0.001
 batch_size = 500
 n_epochs = 1000
 latent_dim = 128
+lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 25, 0.9)
+tb_dir = "logs_with_class"
+saved_models_dir = "saved_models"
+simple_dataset_dir = "simple_dataset"
 
-tf.config.experimental.set_memory_growth(tf.config.experimental.list_physical_devices('GPU')[0], True)
-    
-    
-def train_with_class(train_data, val_data, image_vae_models, middle_layers, class_vae_models):
-    lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 25, 0.9)
+
+def train(train_data, val_data, image_vae_models, middle_layers, class_vae_models):
     optimizer = Adam(lr_schedule.get_lr)
+    all_variables = \
+        image_vae_models["encoder"].trainable_variables + image_vae_models["decoder"].trainable_variables + \
+        class_vae_models["encoder"].trainable_variables + class_vae_models["decoder"].trainable_variables + \
+        middle_layers.trainable_variables
 
-    tb_train_writer = tf.summary.create_file_writer("logs_with_class_only_class/train")
-    tb_val_writer = tf.summary.create_file_writer("logs_with_class_only_class/val")
+    # Tensorboard:
+    tb_train_writer = tf.summary.create_file_writer(os.path.join(tb_dir, "train"))
+    tb_val_writer = tf.summary.create_file_writer(os.path.join(tb_dir, "val"))
 
+    # Metrics:
     image_vae_reconstruction_loss_metric = tf.metrics.Mean()
     image_vae_internal_loss_metric = tf.metrics.Mean()
     image_vae_total_loss_metric = tf.metrics.Mean()
@@ -37,82 +45,100 @@ def train_with_class(train_data, val_data, image_vae_models, middle_layers, clas
 
     total_loss_metric = tf.metrics.Mean()
 
-    all_variables = class_vae_models["encoder"].trainable_variables + class_vae_models["decoder"].trainable_variables #+\
-        #image_vae_models["encoder"].trainable_variables + image_vae_models["decoder"].trainable_variables +\
-        #middle_layers.trainable_variables
+    def calc_outputs(x, y):
+        image_latent_code = image_vae_models["encoder"](x)
+        image_reconstructed = image_vae_models["decoder"](image_latent_code)
+        image2class_latent_code = middle_layers(image_latent_code)
+        class_prediction = class_vae_models["decoder"](image2class_latent_code)
+        class_latent_code = class_vae_models["encoder"](y)
+        class_reconstructed = class_vae_models["decoder"](class_latent_code)
+        return image_reconstructed, class_prediction, class_reconstructed
+
+    def calc_losses(x, y, outputs):
+        image_reconstructed, class_prediction, class_reconstructed = outputs
+
+        image_vae_internal_loss = tf.reduce_sum(image_vae_models["encoder"].losses) * 0.001
+        image_vae_reconstruction_loss = calc_reconstruction_loss(x, image_reconstructed)
+        image_vae_total_loss = image_vae_internal_loss + image_vae_reconstruction_loss
+
+        class_vae_internal_loss = tf.reduce_sum(class_vae_models["encoder"].losses) * 0.00001
+        class_vae_reconstruction_loss = calc_reconstruction_loss(y, class_reconstructed)
+        class_vae_total_loss = class_vae_internal_loss + class_vae_reconstruction_loss
+
+        classification_loss = calc_reconstruction_loss(y, class_prediction)
+
+        total_loss = image_vae_total_loss + class_vae_total_loss + classification_loss
+
+        return total_loss, [image_vae_internal_loss, image_vae_reconstruction_loss, image_vae_total_loss,
+                            class_vae_internal_loss, class_vae_reconstruction_loss, class_vae_total_loss,
+                            classification_loss, total_loss]
+
+    def update_classification_accuracy_metrics(y, outputs):
+        image_reconstructed, class_prediction, class_reconstructed = outputs
+        class_vae_reconstruction_accuracy_metric.update_state(y, class_reconstructed)
+        class_accuracy_metric.update_state(y, class_prediction)
+
+    def update_loss_metrics(losses):
+        image_vae_internal_loss, image_vae_reconstruction_loss, image_vae_total_loss, \
+            class_vae_internal_loss, class_vae_reconstruction_loss, class_vae_total_loss, \
+            classification_loss, total_loss = losses
+        image_vae_internal_loss_metric.update_state(image_vae_internal_loss)
+        image_vae_reconstruction_loss_metric.update_state(image_vae_reconstruction_loss)
+        image_vae_total_loss_metric.update_state(image_vae_total_loss)
+        class_vae_internal_loss_metric.update_state(class_vae_internal_loss)
+        class_vae_reconstruction_loss_metric.update_state(class_vae_reconstruction_loss)
+        class_vae_total_loss_metric.update_state(class_vae_total_loss)
+        classification_loss_metric.update_state(classification_loss)
+        total_loss_metric.update_state(total_loss)
+
+    def write_metrics():
+        tf.summary.scalar("image_vae/internal_loss", image_vae_internal_loss_metric.result(), epoch)
+        tf.summary.scalar("image_vae/reconstruction_loss", image_vae_reconstruction_loss_metric.result(), epoch)
+        tf.summary.scalar("image_vae/total_loss", image_vae_total_loss_metric.result(), epoch)
+        tf.summary.scalar("class_vae/internal_loss", class_vae_internal_loss_metric.result(), epoch)
+        tf.summary.scalar("class_vae/reconstruction_loss", class_vae_reconstruction_loss_metric.result(), epoch)
+        tf.summary.scalar("class_vae/reconstruction_accuracy", class_vae_reconstruction_accuracy_metric.result(),
+                          epoch)
+        tf.summary.scalar("class_vae/total_loss", class_vae_total_loss_metric.result(), epoch)
+        tf.summary.scalar("class/loss", classification_loss_metric.result(), epoch)
+        tf.summary.scalar("class/accuracy", class_accuracy_metric.result(), epoch)
+        tf.summary.scalar("total_loss", total_loss_metric.result(), epoch)
+
+    def reset_metrics():
+        image_vae_internal_loss_metric.reset_states()
+        image_vae_reconstruction_loss_metric.reset_states()
+        image_vae_total_loss_metric.reset_states()
+        class_vae_internal_loss_metric.reset_states()
+        class_vae_reconstruction_loss_metric.reset_states()
+        class_vae_reconstruction_accuracy_metric.reset_states()
+        class_vae_total_loss_metric.reset_states()
+        classification_loss_metric.reset_states()
+        class_accuracy_metric.reset_states()
+        total_loss_metric.reset_states()
 
     @tf.function
     def test():
         for batch in val_data:
-            x_train = batch["features"]
-            y_train = batch["label"]
-            #image_latent_code = image_vae_models["encoder"](x_train)
-            #image_reconstructed = image_vae_models["decoder"](image_latent_code)
-            #image2class_latent_code = middle_layers(image_latent_code)
-            #class_prediction = class_vae_models["decoder"](image2class_latent_code)
-            class_latent_code = class_vae_models["encoder"](y_train)
-            class_reconstructed = class_vae_models["decoder"](class_latent_code)
-
-            #image_vae_internal_loss = tf.reduce_sum(image_vae_models["encoder"].losses)
-            #image_vae_reconstruction_loss = calc_reconstruction_loss(x_train, image_reconstructed)
-            #image_vae_total_loss = image_vae_internal_loss + image_vae_reconstruction_loss
-
-            class_vae_internal_loss = tf.reduce_sum(class_vae_models["encoder"].losses)
-            class_vae_reconstruction_loss = calc_reconstruction_loss(y_train, class_reconstructed)
-            class_vae_total_loss = class_vae_reconstruction_loss
-
-            #classification_loss = calc_reconstruction_loss(y_train, class_prediction)
-
-            total_loss = class_vae_total_loss#image_vae_total_loss + class_vae_total_loss + classification_loss
-
-            #image_vae_internal_loss_metric.update_state(image_vae_internal_loss)
-            #image_vae_reconstruction_loss_metric.update_state(image_vae_reconstruction_loss)
-            #image_vae_total_loss_metric.update_state(image_vae_total_loss)
-            class_vae_internal_loss_metric.update_state(class_vae_internal_loss)
-            class_vae_reconstruction_loss_metric.update_state(class_vae_reconstruction_loss)
-            class_vae_reconstruction_accuracy_metric.update_state(y_train, class_reconstructed)
-            class_vae_total_loss_metric.update_state(class_vae_total_loss)
-            #classification_loss_metric.update_state(classification_loss)
-            #class_accuracy_metric.update_state(y_train, class_prediction)
-            total_loss_metric.update_state(total_loss)
+            x = batch["features"]
+            y = batch["label"]
+            outputs = calc_outputs(x, y)
+            _, losses = calc_losses(x, y, outputs)
+            update_classification_accuracy_metrics(y, outputs)
+            update_loss_metrics(losses)
 
     @tf.function
     def train_one_epoch():
         for batch in train_data:
-            x_train = batch["features"]
-            y_train = batch["label"]
+            x = batch["features"]
+            y = batch["label"]
             with tf.GradientTape() as tape:
-                #image_latent_code = image_vae_models["encoder"](x_train)
-                #image_reconstructed = image_vae_models["decoder"](image_latent_code)
-                #image2class_latent_code = middle_layers(image_latent_code)
-                #class_prediction = class_vae_models["decoder"](image2class_latent_code)
-                class_latent_code = class_vae_models["encoder"](y_train)
-                class_reconstructed = class_vae_models["decoder"](class_latent_code)
-
-                #image_vae_internal_loss = tf.reduce_sum(image_vae_models["encoder"].losses)
-                #image_vae_reconstruction_loss = calc_reconstruction_loss(x_train, image_reconstructed)
-                #image_vae_total_loss = image_vae_internal_loss + image_vae_reconstruction_loss
-
-                class_vae_internal_loss = tf.reduce_sum(class_vae_models["encoder"].losses)
-                class_vae_reconstruction_loss = calc_reconstruction_loss(y_train, class_reconstructed)
-                class_vae_total_loss = class_vae_internal_loss + class_vae_reconstruction_loss
-
-                #classification_loss = calc_reconstruction_loss(y_train, class_prediction)
-
-                total_loss = class_vae_total_loss#image_vae_total_loss + class_vae_total_loss + classification_loss
+                outputs = calc_outputs(x, y)
+                total_loss, losses = calc_losses(x, y, outputs)
             grads = tape.gradient(total_loss, all_variables)
             optimizer.apply_gradients(zip(grads, all_variables))
 
-            #image_vae_internal_loss_metric.update_state(image_vae_internal_loss)
-            #image_vae_reconstruction_loss_metric.update_state(image_vae_reconstruction_loss)
-            #image_vae_total_loss_metric.update_state(image_vae_total_loss)
-            class_vae_internal_loss_metric.update_state(class_vae_internal_loss)
-            class_vae_reconstruction_loss_metric.update_state(class_vae_reconstruction_loss)
-            class_vae_reconstruction_accuracy_metric.update_state(y_train, class_reconstructed)
-            class_vae_total_loss_metric.update_state(class_vae_total_loss)
-            #classification_loss_metric.update_state(classification_loss)
-            #class_accuracy_metric.update_state(y_train, class_prediction)
-            total_loss_metric.update_state(total_loss)
+            update_classification_accuracy_metrics(y, outputs)
+            update_loss_metrics(losses)
 
     for epoch in tqdm(range(n_epochs)):
         train_one_epoch()
@@ -120,52 +146,14 @@ def train_with_class(train_data, val_data, image_vae_models, middle_layers, clas
 
         with tb_train_writer.as_default():
             tf.summary.scalar("lr", lr_schedule.get_lr(), epoch)
-            tf.summary.scalar("image_vae/internal_loss", image_vae_internal_loss_metric.result(), epoch)
-            tf.summary.scalar("image_vae/reconstruction_loss", image_vae_reconstruction_loss_metric.result(), epoch)
-            tf.summary.scalar("image_vae/total_loss", image_vae_total_loss_metric.result(), epoch)
-            tf.summary.scalar("class_vae/internal_loss", class_vae_internal_loss_metric.result(), epoch)
-            tf.summary.scalar("class_vae/reconstruction_loss", class_vae_reconstruction_loss_metric.result(), epoch)
-            tf.summary.scalar("class_vae/reconstruction_accuracy", class_vae_reconstruction_accuracy_metric.result(), epoch)
-            tf.summary.scalar("class_vae/total_loss", class_vae_total_loss_metric.result(), epoch)
-            tf.summary.scalar("class/loss", classification_loss_metric.result(), epoch)
-            tf.summary.scalar("class/accuracy", class_accuracy_metric.result(), epoch)
-            tf.summary.scalar("total_loss", total_loss_metric.result(), epoch)
-        image_vae_internal_loss_metric.reset_states()
-        image_vae_reconstruction_loss_metric.reset_states()
-        image_vae_total_loss_metric.reset_states()
-        class_vae_internal_loss_metric.reset_states()
-        class_vae_reconstruction_loss_metric.reset_states()
-        class_vae_reconstruction_accuracy_metric.reset_states()
-        class_vae_total_loss_metric.reset_states()
-        classification_loss_metric.reset_states()
-        class_accuracy_metric.reset_states()
-        total_loss_metric.reset_states()
+            write_metrics()
+        reset_metrics()
 
         test()
 
-        print(class_vae_reconstruction_accuracy_metric.result())
-
         with tb_val_writer.as_default():
-            tf.summary.scalar("image_vae/internal_loss", image_vae_internal_loss_metric.result(), epoch)
-            tf.summary.scalar("image_vae/reconstruction_loss", image_vae_reconstruction_loss_metric.result(), epoch)
-            tf.summary.scalar("image_vae/total_loss", image_vae_total_loss_metric.result(), epoch)
-            tf.summary.scalar("class_vae/internal_loss", class_vae_internal_loss_metric.result(), epoch)
-            tf.summary.scalar("class_vae/reconstruction_loss", class_vae_reconstruction_loss_metric.result(), epoch)
-            tf.summary.scalar("class_vae/reconstruction_accuracy", class_vae_reconstruction_accuracy_metric.result(), epoch)
-            tf.summary.scalar("class_vae/total_loss", class_vae_total_loss_metric.result(), epoch)
-            tf.summary.scalar("class/loss", classification_loss_metric.result(), epoch)
-            tf.summary.scalar("class/accuracy", class_accuracy_metric.result(), epoch)
-            tf.summary.scalar("total_loss", total_loss_metric.result(), epoch)
-        image_vae_internal_loss_metric.reset_states()
-        image_vae_reconstruction_loss_metric.reset_states()
-        image_vae_total_loss_metric.reset_states()
-        class_vae_internal_loss_metric.reset_states()
-        class_vae_reconstruction_loss_metric.reset_states()
-        class_vae_reconstruction_accuracy_metric.reset_states()
-        class_vae_total_loss_metric.reset_states()
-        classification_loss_metric.reset_states()
-        class_accuracy_metric.reset_states()
-        total_loss_metric.reset_states()
+            write_metrics()
+        reset_metrics()
 
 
 def main_with_class():
@@ -175,21 +163,67 @@ def main_with_class():
 
     train_data, val_data = mnist.get_data(batch_size)
 
-    train_with_class(train_data, val_data, image_vae_models, middle_layers, class_vae_models)
+    train(train_data, val_data, image_vae_models, middle_layers, class_vae_models)
 
+    input("Press ENTER to draw images")
+    plot_images(val_data, image_vae_models)
+
+    input("Press ENTER to create simple dataset")
+    convert_dataset(train_data, val_data, image_vae_models, class_vae_models)
+
+    input("Press ENTER to save models")
+    save_models(image_vae_models, class_vae_models)
+
+
+def save_models(image_vae_models, class_vae_models):
+    if os.path.isdir(saved_models_dir):
+        print("WARNING, writing at existing directory")
+    else:
+        os.mkdir(saved_models_dir)
+    image_vae_models["encoder"].save(os.path.join(saved_models_dir, "image_encoder"), include_optimizer=False)
+    image_vae_models["decoder"].save(os.path.join(saved_models_dir, "image_decoder"), include_optimizer=False)
+    class_vae_models["encoder"].save(os.path.join(saved_models_dir, "class_encoder"), include_optimizer=False)
+    class_vae_models["decoder"].save(os.path.join(saved_models_dir, "class_decoder"), include_optimizer=False)
+
+
+def plot_images(val_data, image_vae_models):
     images = next(iter(val_data))["features"][:10].numpy()
     decoded = image_vae_models['vae'].predict(images)
     plot_digits(images[:10], decoded[:10])
     plot_manifold(image_vae_models["decoder"], latent_dim=latent_dim)
-    input()
 
-    if not os.path.isdir("saved_model"):
-        os.mkdir("saved_model")
-    image_vae_models["encoder"].save("saved_model/image_encoder")
-    image_vae_models["decoder"].save("saved_model/image_decoder")
-    middle_layers.save("saved_model/middle_layers")
-    class_vae_models["encoder"].save("saved_model/class_encoder")
-    class_vae_models["decoder"].save("saved_model/class_decoder")
+
+def convert_dataset(train_data, val_data, image_vae_models, class_vae_models):
+    train_x = []
+    train_y = []
+    test_x = []
+    test_y = []
+
+    if os.path.isdir(simple_dataset_dir):
+        print("WARNING, writing at existing directory")
+    else:
+        os.mkdir(simple_dataset_dir)
+
+    for batch in train_data:
+        x = batch["features"]
+        y = batch["label"]
+        image_latent_code = image_vae_models["encoder"](x)
+        class_latent_code = class_vae_models["encoder"](y)
+        train_x.append(image_latent_code.numpy())
+        train_y.append(class_latent_code.numpy())
+
+    for batch in val_data:
+        x = batch["features"]
+        y = batch["label"]
+        image_latent_code = image_vae_models["encoder"](x)
+        class_latent_code = class_vae_models["encoder"](y)
+        test_x.append(image_latent_code.numpy())
+        test_y.append(class_latent_code.numpy())
+
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_x")), np.concatenate(train_x), allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_y")), np.concatenate(train_y), allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_x")), np.concatenate(test_x), allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_y")), np.concatenate(test_y), allow_pickle=False)
 
 
 main_with_class()
