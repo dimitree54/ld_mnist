@@ -54,3 +54,9 @@ def plot_manifold(generator, digit_size=28, n=10, latent_dim=2):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     plt.show()
+
+
+def plot_histogram(data, name):
+    plt.hist(data.flatten(), bins='auto')
+    plt.title(f"Histogram of {name}")
+    plt.show()

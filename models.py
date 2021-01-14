@@ -26,10 +26,10 @@ def create_image_vae(dropout_rate=0.3, latent_dim=2):
 
     input_img = Input(shape=(28, 28, 1))
     x = Flatten()(input_img)
-    x = Dense(256, activation='relu')(x)
+    x = Dense(128, activation='relu')(x)
     x = BatchNormalization()(x)
     x = Dropout(dropout_rate)(x)
-    x = Dense(128, activation='relu')(x)
+    x = Dense(64, activation='relu')(x)
     x = BatchNormalization()(x)
     x = Dropout(dropout_rate)(x)
 

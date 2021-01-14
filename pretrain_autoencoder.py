@@ -6,14 +6,14 @@ import numpy as np
 
 from misc import LRScheduleWithReduceOnPlato
 from models import create_image_vae, calc_reconstruction_loss, create_middle_layers, create_class_vae
-from plots_drawer import plot_digits, plot_manifold
+from plots_drawer import plot_digits, plot_manifold, plot_histogram
 import mnist
 
 start_lr = 0.001
 batch_size = 500
-n_epochs = 1000
-latent_dim = 128
-lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 25, 0.9)
+n_epochs = 50000
+latent_dim = 32
+lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 100, 0.9)
 tb_dir = "logs_with_class"
 saved_models_dir = "saved_models"
 simple_dataset_dir = "simple_dataset"
@@ -57,11 +57,11 @@ def train(train_data, val_data, image_vae_models, middle_layers, class_vae_model
     def calc_losses(x, y, outputs):
         image_reconstructed, class_prediction, class_reconstructed = outputs
 
-        image_vae_internal_loss = tf.reduce_sum(image_vae_models["encoder"].losses) * 0.001
+        image_vae_internal_loss = tf.reduce_sum(image_vae_models["encoder"].losses) * 0.1
         image_vae_reconstruction_loss = calc_reconstruction_loss(x, image_reconstructed)
         image_vae_total_loss = image_vae_internal_loss + image_vae_reconstruction_loss
 
-        class_vae_internal_loss = tf.reduce_sum(class_vae_models["encoder"].losses) * 0.00001
+        class_vae_internal_loss = tf.reduce_sum(class_vae_models["encoder"].losses) * 0.1
         class_vae_reconstruction_loss = calc_reconstruction_loss(y, class_reconstructed)
         class_vae_total_loss = class_vae_internal_loss + class_vae_reconstruction_loss
 
@@ -156,7 +156,7 @@ def train(train_data, val_data, image_vae_models, middle_layers, class_vae_model
         reset_metrics()
 
 
-def main_with_class():
+def main():
     image_vae_models = create_image_vae(latent_dim=latent_dim)
     middle_layers = create_middle_layers(latent_dim=latent_dim)
     class_vae_models = create_class_vae(latent_dim=latent_dim)
@@ -168,8 +168,15 @@ def main_with_class():
     input("Press ENTER to draw images")
     plot_images(val_data, image_vae_models)
 
-    input("Press ENTER to create simple dataset")
-    convert_dataset(train_data, val_data, image_vae_models, class_vae_models)
+    input("Press ENTER to create simple dataset, save it and show statistics")
+    train_x, train_y, test_x, test_y = convert_dataset(train_data, val_data, image_vae_models, class_vae_models)
+
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_x")), train_x, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_y")), train_y, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_x")), test_x, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_y")), test_y, allow_pickle=False)
+
+    show_dataset_statistics(train_x, train_y)
 
     input("Press ENTER to save models")
     save_models(image_vae_models, class_vae_models)
@@ -220,10 +227,25 @@ def convert_dataset(train_data, val_data, image_vae_models, class_vae_models):
         test_x.append(image_latent_code.numpy())
         test_y.append(class_latent_code.numpy())
 
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_x")), np.concatenate(train_x), allow_pickle=False)
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_y")), np.concatenate(train_y), allow_pickle=False)
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_x")), np.concatenate(test_x), allow_pickle=False)
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_y")), np.concatenate(test_y), allow_pickle=False)
+    train_x = np.concatenate(train_x)
+    train_y = np.concatenate(train_y)
+    test_x = np.concatenate(test_x)
+    test_y = np.concatenate(test_y)
+
+    return train_x, train_y, test_x, test_y
 
 
-main_with_class()
+def show_dataset_statistics(train_x, train_y):
+    train_x_mean = np.mean(train_x)
+    train_x_std = np.std(train_x)
+    train_y_mean = np.mean(train_x)
+    train_y_std = np.std(train_x)
+
+    print("train_x mean and std:", train_x_mean, train_x_std)
+    print("train_y mean and std:", train_y_mean, train_y_std)
+
+    plot_histogram(train_x, "train_x")
+    plot_histogram(train_y, "train_y")
+
+
+main()
