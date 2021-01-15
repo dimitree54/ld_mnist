@@ -29,7 +29,7 @@ def plot_digits(*args, invert_colors=False, digit_size=28):
     plt.show()
 
 
-def plot_manifold(generator, digit_size=28, n=10, latent_dim=2):
+def plot_manifold(generator, digit_size=28, n=10, latent_dim=2, x_dim=0, y_dim=1):
     # Так как сэмплируем из N(0, I), то сетку узлов, в которых генерируем цифры берем из обратной функции распределения
     grid_x = norm.ppf(np.linspace(0.05, 0.95, n))
     grid_y = norm.ppf(np.linspace(0.05, 0.95, n))
@@ -40,7 +40,8 @@ def plot_manifold(generator, digit_size=28, n=10, latent_dim=2):
     for i, yi in enumerate(grid_x):
         for j, xi in enumerate(grid_y):
             z_sample = np.zeros((1, latent_dim))
-            z_sample[:, :2] = np.array([[xi, yi]])
+            z_sample[:, x_dim] = np.array([xi])
+            z_sample[:, y_dim] = np.array([yi])
 
             x_decoded = generator.predict(z_sample)
             digit = x_decoded[0].squeeze()
@@ -49,6 +50,7 @@ def plot_manifold(generator, digit_size=28, n=10, latent_dim=2):
     # Визуализация
     plt.figure(figsize=(15, 15))
     plt.imshow(figure, cmap='Greys_r')
+    plt.title(f"Variations at {x_dim}-th and {y_dim}-th components.")
     plt.grid(None)
     ax = plt.gca()
     ax.get_xaxis().set_visible(False)
@@ -56,7 +58,7 @@ def plot_manifold(generator, digit_size=28, n=10, latent_dim=2):
     plt.show()
 
 
-def plot_histogram(data, name):
+def plot_histogram(data, title="hist"):
     plt.hist(data.flatten(), bins='auto')
-    plt.title(f"Histogram of {name}")
+    plt.title(title)
     plt.show()
