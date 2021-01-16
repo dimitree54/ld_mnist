@@ -22,10 +22,11 @@ simple_dataset_dir = "simple_dataset"
 
 def train(train_data, val_data, image_vae_models, middle_layers, class_vae_models):
     optimizer = Adam(lr_schedule.get_lr)
+    middle_layers_optimizer = Adam(lr_schedule.get_lr)
     all_variables = \
         image_vae_models["encoder"].trainable_variables + image_vae_models["decoder"].trainable_variables + \
-        class_vae_models["encoder"].trainable_variables + class_vae_models["decoder"].trainable_variables + \
-        middle_layers.trainable_variables
+        class_vae_models["encoder"].trainable_variables + class_vae_models["decoder"].trainable_variables
+    middle_layers_variables = middle_layers.trainable_variables
 
     # Tensorboard:
     tb_train_writer = tf.summary.create_file_writer(os.path.join(tb_dir, "train"))
@@ -132,11 +133,13 @@ def train(train_data, val_data, image_vae_models, middle_layers, class_vae_model
         for batch in train_data:
             x = batch["features"]
             y = batch["label"]
-            with tf.GradientTape() as tape:
+            with tf.GradientTape(persistent=True) as tape:
                 outputs = calc_outputs(x, y)
                 total_loss, losses = calc_losses(x, y, outputs)
             grads = tape.gradient(total_loss, all_variables)
+            middle_layers_grads = tape.gradient(total_loss, middle_layers_variables)
             optimizer.apply_gradients(zip(grads, all_variables))
+            middle_layers_optimizer.apply_gradients(zip(middle_layers_grads, middle_layers_variables))
 
             update_classification_accuracy_metrics(y, outputs)
             update_loss_metrics(losses)
@@ -172,16 +175,16 @@ def main():
     input("Press ENTER to create simple dataset, save it and show statistics")
     train_x, train_y, test_x, test_y = convert_dataset(train_data, val_data, image_vae_models, class_vae_models)
 
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_x")), train_x, allow_pickle=False)
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_y")), train_y, allow_pickle=False)
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_x")), test_x, allow_pickle=False)
-    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_y")), test_y, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_x.npy")), train_x, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "train_y.npy")), train_y, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_x.npy")), test_x, allow_pickle=False)
+    np.save(os.path.join(os.path.join(simple_dataset_dir, "test_y.npy")), test_y, allow_pickle=False)
 
     show_dataset_statistics(train_x, train_y)
 
     input("Press ENTER to save models and eval middle_layers")
     save_models(image_vae_models, class_vae_models)
-    evaluate(test_x, test_y, middle_layers, class_vae_models["decoder"])
+    evaluate(middle_layers)
 
 
 def save_models(image_vae_models, class_vae_models):
@@ -199,7 +202,8 @@ def plot_images(val_data, image_vae_models):
     images = next(iter(val_data))["features"][:10].numpy()
     decoded = image_vae_models['vae'].predict(images)
     plot_digits(images[:10], decoded[:10])
-    plot_manifold(image_vae_models["decoder"], latent_dim=latent_dim, x_dim=0, y_dim=1)
+    for i in range(0, latent_dim, 2):
+        plot_manifold(image_vae_models["decoder"], latent_dim=latent_dim, x_dim=i, y_dim=i+1)
 
 
 def convert_dataset(train_data, val_data, image_vae_models, class_vae_models):
@@ -254,4 +258,5 @@ def show_dataset_statistics(train_x, train_y):
     plot_histogram(train_y, f"hist of train_y (mean={train_y_mean:.3f}, std={train_y_std:.3f}")
 
 
-main()
+if __name__ == "__main__":
+    main()
