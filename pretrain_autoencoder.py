@@ -4,16 +4,17 @@ from tqdm import tqdm
 import os
 import numpy as np
 
+from eval import evaluate
 from misc import LRScheduleWithReduceOnPlato
 from models import create_image_vae, calc_reconstruction_loss, create_middle_layers, create_class_vae
 from plots_drawer import plot_digits, plot_manifold, plot_histogram
 import mnist
 
 start_lr = 0.001
-batch_size = 500
+batch_size = 10000
 n_epochs = 10000
 latent_dim = 32
-lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 100, 0.9)
+lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 50, 0.9)
 tb_dir = "logs_with_class"
 saved_models_dir = "saved_models"
 simple_dataset_dir = "simple_dataset"
@@ -157,11 +158,11 @@ def train(train_data, val_data, image_vae_models, middle_layers, class_vae_model
 
 
 def main():
-    image_vae_models = create_image_vae(dropout_rate=0.3, latent_dim=latent_dim)
-    middle_layers = create_middle_layers(dropout_rate=0.75, latent_dim=latent_dim)
+    image_vae_models = create_image_vae(dropout_rate=0.9, latent_dim=latent_dim)
+    middle_layers = create_middle_layers(dropout_rate=0.9, latent_dim=latent_dim)
     class_vae_models = create_class_vae(latent_dim=latent_dim)
 
-    train_data, val_data = mnist.get_data(batch_size)
+    train_data, val_data = mnist.Mnist().get_train_val_datasets(batch_size)
 
     train(train_data, val_data, image_vae_models, middle_layers, class_vae_models)
 
@@ -178,8 +179,9 @@ def main():
 
     show_dataset_statistics(train_x, train_y)
 
-    input("Press ENTER to save models")
+    input("Press ENTER to save models and eval middle_layers")
     save_models(image_vae_models, class_vae_models)
+    evaluate(test_x, test_y, middle_layers, class_vae_models["decoder"])
 
 
 def save_models(image_vae_models, class_vae_models):
@@ -248,8 +250,8 @@ def show_dataset_statistics(train_x, train_y):
         print(f"train_x mean and std of {i}-th component:", np.mean(train_x[:, i]), np.std(train_x[:, i]))
         print(f"train_y mean and std of {i}-th component:", np.mean(train_y[:, i]), np.std(train_y[:, i]))
 
-    plot_histogram(train_x, f"hist of train_x (mean={train_x_mean}, std={train_x_std}")
-    plot_histogram(train_y, f"hist of train_y (mean={train_y_mean}, std={train_y_std}")
+    plot_histogram(train_x, f"hist of train_x (mean={train_x_mean:.3f}, std={train_x_std:.3f}")
+    plot_histogram(train_y, f"hist of train_y (mean={train_y_mean:.3f}, std={train_y_std:.3f}")
 
 
 main()

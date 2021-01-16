@@ -8,7 +8,7 @@ def sampling(args):
     _z_mean, _z_log_var, latent_dim = args
     batch_size = tf.shape(_z_mean)[0]
     epsilon = tf.random.normal(shape=(batch_size, latent_dim), mean=0., stddev=1.0)
-    return _z_mean + tf.exp(_z_log_var / 2) * epsilon
+    return _z_mean + tf.exp(_z_log_var) * epsilon
 
 
 def calc_reconstruction_loss(input_x, decoded_x):
@@ -39,11 +39,12 @@ def create_image_vae(dropout_rate=0.3, latent_dim=2):
     latent_code = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var, latent_dim])
 
     z = Input(shape=(latent_dim,))
-    x = Dense(128)(z)
+    x = Dropout(dropout_rate)(z)
+    x = Dense(64)(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(dropout_rate)(x)
-    x = Dense(256)(x)
+    x = Dense(128)(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(dropout_rate)(x)
