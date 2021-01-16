@@ -17,9 +17,11 @@ class Mnist:
         self.train_y = np.eye(10)[y_train]  # one hot
         self.test_y = np.eye(10)[y_test]
 
-    def get_train_val_datasets(self, batch_size):
-        train_batches = tf.data.Dataset.from_tensor_slices({"features": self.train_x, "label": self.train_y}) \
-            .shuffle(SHUFFLE_BUFFER_SIZE).batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+    def get_train_val_datasets(self, batch_size, shuffle=True):
+        train_batches = tf.data.Dataset.from_tensor_slices({"features": self.train_x, "label": self.train_y})
+        if shuffle:
+            train_batches = train_batches.shuffle(SHUFFLE_BUFFER_SIZE)
+        train_batches = train_batches.batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
         validation_batches = tf.data.Dataset.from_tensor_slices({"features": self.test_x, "label": self.test_y}) \
             .batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
         return train_batches, validation_batches

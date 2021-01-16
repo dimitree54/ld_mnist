@@ -165,7 +165,8 @@ def main():
     middle_layers = create_middle_layers(dropout_rate=0.9, latent_dim=latent_dim)
     class_vae_models = create_class_vae(latent_dim=latent_dim)
 
-    train_data, val_data = mnist.Mnist().get_train_val_datasets(batch_size)
+    orig_mnist = mnist.Mnist()
+    train_data, val_data = orig_mnist.get_train_val_datasets(batch_size)
 
     train(train_data, val_data, image_vae_models, middle_layers, class_vae_models)
 
@@ -173,7 +174,7 @@ def main():
     plot_images(val_data, image_vae_models)
 
     input("Press ENTER to create simple dataset, save it and show statistics")
-    train_x, train_y, test_x, test_y = convert_dataset(train_data, val_data, image_vae_models, class_vae_models)
+    train_x, train_y, test_x, test_y = convert_dataset(orig_mnist, image_vae_models, class_vae_models)
 
     np.save(os.path.join(os.path.join(simple_dataset_dir, "train_x.npy")), train_x, allow_pickle=False)
     np.save(os.path.join(os.path.join(simple_dataset_dir, "train_y.npy")), train_y, allow_pickle=False)
@@ -184,7 +185,7 @@ def main():
 
     input("Press ENTER to save models and eval middle_layers")
     save_models(image_vae_models, class_vae_models)
-    evaluate(middle_layers)
+    evaluate(middle_layers, mnist.LdMnist(simple_dataset_dir), orig_mnist, class_vae_models["decoder"])
 
 
 def save_models(image_vae_models, class_vae_models):
@@ -206,7 +207,8 @@ def plot_images(val_data, image_vae_models):
         plot_manifold(image_vae_models["decoder"], latent_dim=latent_dim, x_dim=i, y_dim=i+1)
 
 
-def convert_dataset(train_data, val_data, image_vae_models, class_vae_models):
+def convert_dataset(orig_mnist, image_vae_models, class_vae_models):
+    train_data, val_data = orig_mnist.get_train_val_datasets(batch_size=batch_size, shuffle=False)
     train_x = []
     train_y = []
     test_x = []
