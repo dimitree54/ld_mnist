@@ -40,8 +40,8 @@ def create_and_train_middle_layers(latent_dim, ld_mnist):
 def main():
     latent_dim = 32
     original_mnist = Mnist()
-    ld_mnist = LdMnist("simple_dataset")
-    class_decoder = tf.keras.models.load_model(os.path.join("saved_models", "class_decoder"))
+    ld_mnist = LdMnist("ld_mnist_dataset_v3")
+    class_decoder = tf.keras.models.load_model(os.path.join("saved_models_v3", "class_decoder"))
 
     linear_model = create_and_train_linear_model(latent_dim, ld_mnist)
     print("Linear model evaluation:")
