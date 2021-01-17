@@ -115,5 +115,5 @@ link to model | short description | MSE | reconstructed accuracy
 :-------------|------------------:|:---------------|----------:
 [link](https://github.com/dimitree54/ld_mnist) | 3 FC ReLu layers with BN and 0.1 DO | 0.8347 | 0.9577
 [link](https://github.com/dimitree54/ld_mnist) | linear regression | 0.8701 | 0.5984
-[link](https://github.com/dimitree54/ld_mnist) | 3 FC ReLu layers with BN and 0.1 DO trained together with VAE with classification loss (not MSE) | 44.7705 | 0.9710
+[link](https://github.com/dimitree54/ld_mnist) | 3 FC ReLu layers with BN and 0.9 DO trained together with VAE with classification loss (not MSE) | 44.7705 | 0.9710
 
