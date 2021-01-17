@@ -1,23 +1,23 @@
 # Low dimensional MNIST Dataset
 
-When I provide experiments with custom neural models or alternative training rules, I usually use lightweight datasets such as MNIST, CIFAR or IRIS. But sometimes I am afraid that my experimental models work not well enough not because they are bad, but because of extra difficulties of the toy tasks. For example MNIST has a significant dimensionality reduction (from 784 to 10). Another difficulty of the MNIST dataset is different input-output data structure and distribution (input is dense black and white pixels and output is a sparse one-hot vector).
+When I conduct experiments with custom neural models or alternative training rules, I usually use lightweight datasets such as MNIST, CIFAR or IRIS. But sometimes I am afraid that my experimental models don't work well enough not because they are bad, but because of extra difficulties of the toy tasks. For example MNIST has a significant dimensionality reduction (from 784 to 10). Another difficulty of the MNIST dataset is different input-output data structure and distribution (input is dense black and white pixels and output is a sparse one-hot vector).
 
-Looking for a simpler toy dataset for my experimental models I have created a “Low dimensional MNIST Dataset” where 784-pixels images mapped to the 32-dimensional vector using VAE and 10-dimensional labels also mapped to the 32-dimensional vector using VAE. Both of these latent vectors have the same structure and similar distribution. Now I can test my custom models for the ability to map one normally distributed vector to another.
+Looking for a simpler toy dataset for my experimental models I have created a “Low dimensional MNIST Dataset” where 784-pixels images are mapped to 32-dimensional vectors using VAE and 10-dimensional labels are also mapped to 32-dimensional vectors using VAE. Both of these latent vectors have the same structure and similar distribution. Now I can test my custom models for the ability to map one normally distributed vector to another.
 
 ![ld_mnist_model](readme_images/ld_mnist_model.jpg)
 
 ## Download links:
-You can create this dataset on your own with any other latent dimension size, or [download my with 32 dimensions](https://drive.google.com/file/d/11HDpYeC3QomPbuBQ5E1sheGfPVjfIaQs/view?usp=sharing). VAE which I used for dataset creation I have also saved. Using [these models](https://drive.google.com/file/d/1Y6DKTURSCMVJsQC1jpoIGX14nSJEtOUE/view?usp=sharing) you can reconstruct close to original images and labels from your 32-dimensional vectors.
+You can create this dataset on your own with any other latent dimension size, or [download mine with 32 dimensions](https://drive.google.com/file/d/11HDpYeC3QomPbuBQ5E1sheGfPVjfIaQs/view?usp=sharing). VAE which I used for dataset creation I have also saved. Using [these models](https://drive.google.com/file/d/1Y6DKTURSCMVJsQC1jpoIGX14nSJEtOUE/view?usp=sharing) you can reconstruct images and labels from your 32-dimensional vectors close to original.
 
 
 ## Dataset statistics.
-Both image and class latent vectors have similar normal distribution. Here is united components hist:
+Both image and class latent vectors follow similar normal distribution. Here is united components hist:
 
 hist_train_x           |  hist_train_y
 :-------------------------:|:-------------------------:
 ![hist_train_x](readme_images/hist_train_x.png) | ![hist_train_y](readme_images/hist_train_y.png)
 
-Here is per-component mean and std for the train_x:
+This is per-component mean and std for train_x:
 
 ```
 train_x mean and std: 0.00025720912 0.9004887
@@ -87,27 +87,27 @@ train_y mean and std of 30-th component: 0.0061761006 1.0054103
 train_x mean and std of 31-th component: -0.0017093974 1.0031153
 train_y mean and std of 31-th component: -0.004696563 0.9986112
 ```
-You can see that a lot of components have distribution close to standard normal, but some components have std lower than 1 (down to `0.6637745` for 30-th).
+You can see that a lot of components have distribution close to standard normal, but some components have std lower than 1 (down to `0.6637745` for the 30-th).
 
 ## Image VAE
-Here examples of the Image VAE reconstruction abilities 
+These are examples of Image VAE reconstruction abilities 
 ![rec_images](readme_images/rec_images.png)
 
-I am using a very big dropout rate at an image VAE (0.9) to spread information across latent components. Otherwise, almost all the variation can be encoded by 2-d latent vectors. Despite such a big dropout rate some components still do not take part in the decoding process. For example here is visualization of variation at 2 different components of the latent vector. I have chosen such components to show that some affect significantly on the deconstructed image, and some do not.
+I am using a very large dropout rate in image VAE (0.9) to spread information across latent components. Otherwise, almost all the variation can be encoded by 2-d latent vectors. Despite such a large dropout rate some components still do not take part in the decoding process. For example here is visualization of variation at 2 different components of the latent vector. I have chosen such components to show that some of them affect significantly on the deconstructed image, and some do not.
 ![manifold](readme_images/manifold_8_9.png)
 
-Probably a component importance somehow correlated with its deviation (more important components have lower std). By my estimations around only 12 of 32 components affect on decoding noticeably.
+Probably a component importance somehow correlated with its deviation (more important components have lower std). According to my estimations only around 12 of 32 components affect on decoding noticeably.
 
 So my experimental model has to figure out that some input components do not contain a lot of information.
 
 ## Class VAE
-A very simple linear model used at the Class VAE. It is because there is only 10 different inputs exist as the Class VAE input. KL loss is applied for the Class VAE latent space, so the task for the Class VAE decoder is to reconstruct an original label from that randomly sampled latent vector. In 99.84 % cases correct class reconstructed. You should have in mind that both X and Y of the LD MNIST dataset have random nature (sampled by VAE), so there is a limit of the validation MSE that can be achieved (you can not predict that random noise).
+A very simple linear model is used the Class VAE. It is because there is only 10 different inputs exist as the Class VAE input. KL loss is applied for the Class VAE latent space, so the task for the Class VAE decoder is to reconstruct an original label from that randomly sampled latent vector. In 99.84 % cases a correct class is reconstructed. You should have in mind that both X and Y of the LD MNIST dataset have random nature (sampled by VAE), so there is a limit of the validation MSE that can be achieved (you can not predict that random noise).
 
 ## Middle layers
-There is an exemplar neural network trains this mapping function between latent vectors during both VAE training (it is not necessary to train it in parallel, but it is interesting to observe how its quality evolves as VAE latent vectors change). It uses a separate optimizer, so it does not affect VAE training. The loss for these middle layers is binary_crossentropy of classification of the whole “Image VAE Encoder -> Several of Middle layers -> Class VAE decoder” network. Its quality you can check at benchmark table.
+There is an example neural network which learns this mapping function between latent vectors during both VAE training (it is not necessary to train it in parallel, but it is interesting to observe how its quality evolves as VAE latent vectors change). It uses a separate optimizer, so it does not affect VAE training. The loss for these middle layers is binary_crossentropy of classification of the whole “Image VAE Encoder -> Several Middle layers -> Class VAE decoder” network. You can check its quality at benchmark table.
 
 ## Benchmark
-This dataset is intended to train mapping from the input real vector to the output real vector, so it is a regression task, not classification. So I suppose MSE of X to Y mapping can be used as the main quality metric. As additional metric (not for comparison, just for fun) we can use classification accuracy of “Image VAE Encoder -> Test Model -> Class VAE decoder”, but in that case we need to use original dataset labels (note that samples at the ld_mnist provided in the same order as original MNIST from `tf.keras.datasets.mnist.load_data()`). `eval.evaluate()` function calculates these scores for your model.
+This dataset is intended to train mapping from an input real vector to an output real vector, so it is a regression task, not classification. So I suppose MSE of X to Y mapping can be used as the main quality metric. As additional metric (not for comparison, just for fun) we can use classification accuracy of “Image VAE Encoder -> Test Model -> Class VAE decoder”, but in that case we need to use original dataset labels (note that samples in ld_mnist are provided in the same order as original MNIST from `tf.keras.datasets.mnist.load_data()`). `eval.evaluate()` function calculates these scores for your model.
 
 To submit your result (that you got on the dataset provided with the download link) email me your score (MSE, reconstructed accuracy), repository with your model and short description. My email is dimitree54@gmail.com.
 
