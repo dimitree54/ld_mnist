@@ -253,8 +253,8 @@ def show_dataset_statistics(train_x, train_y):
     print("train_y mean and std:", train_y_mean, train_y_std)
 
     for i in range(latent_dim):
-        print(f"train_x mean and std of {i}-th component:", np.mean(train_x[:, i]), np.std(train_x[:, i]))
-        print(f"train_y mean and std of {i}-th component:", np.mean(train_y[:, i]), np.std(train_y[:, i]))
+        print(f"train_x mean and std of {i}-th component: {np.mean(train_x[:, i]):.3f} {np.std(train_x[:, i]):.3f}")
+        print(f"train_y mean and std of {i}-th component: {np.mean(train_y[:, i]):.3f} {np.std(train_y[:, i]):.3f}")
 
     plot_histogram(train_x, f"hist of train_x (mean={train_x_mean:.3f}, std={train_x_std:.3f})")
     plot_histogram(train_y, f"hist of train_y (mean={train_y_mean:.3f}, std={train_y_std:.3f})")
