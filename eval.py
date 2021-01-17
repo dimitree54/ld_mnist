@@ -23,16 +23,16 @@ def create_and_train_linear_model(latent_dim, ld_mnist):
     x = Input(shape=(latent_dim,))
     y = Dense(latent_dim)(x)
     model = Model(x, y)
-    model.compile(tf.keras.optimizers.SGD(0.001), tf.keras.losses.MeanSquaredError())
-    model.fit(ld_mnist.train_x, ld_mnist.train_y, batch_size=10000, epochs=10000, verbose=0,
+    model.compile(Adam(0.001), MeanSquaredError())
+    model.fit(ld_mnist.train_x, ld_mnist.train_y, batch_size=10000, epochs=5000, verbose=0,
               callbacks=ReduceLROnPlateau('loss', 0.9, 50))
     return model
 
 
 def create_and_train_middle_layers(latent_dim, ld_mnist):
-    model = create_middle_layers(0.9, latent_dim)
+    model = create_middle_layers(0.1, latent_dim)
     model.compile(Adam(0.001), MeanSquaredError())
-    model.fit(ld_mnist.train_x, ld_mnist.train_y, batch_size=10000, epochs=10000, verbose=0,
+    model.fit(ld_mnist.train_x, ld_mnist.train_y, batch_size=10000, epochs=5000, verbose=0,
               callbacks=ReduceLROnPlateau('loss', 0.9, 50))
     return model
 

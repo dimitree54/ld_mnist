@@ -12,12 +12,12 @@ import mnist
 
 start_lr = 0.001
 batch_size = 10000
-n_epochs = 10000
+n_epochs = 5000
 latent_dim = 32
 lr_schedule = LRScheduleWithReduceOnPlato(start_lr, 50, 0.9)
-tb_dir = "logs_with_class"
-saved_models_dir = "saved_models"
-simple_dataset_dir = "simple_dataset"
+tb_dir = "logs_with_class_v3"
+saved_models_dir = "saved_models_v3"
+simple_dataset_dir = "ld_mnist_dataset_v3"
 
 
 def train(train_data, val_data, image_vae_models, middle_layers, class_vae_models):
@@ -256,8 +256,8 @@ def show_dataset_statistics(train_x, train_y):
         print(f"train_x mean and std of {i}-th component:", np.mean(train_x[:, i]), np.std(train_x[:, i]))
         print(f"train_y mean and std of {i}-th component:", np.mean(train_y[:, i]), np.std(train_y[:, i]))
 
-    plot_histogram(train_x, f"hist of train_x (mean={train_x_mean:.3f}, std={train_x_std:.3f}")
-    plot_histogram(train_y, f"hist of train_y (mean={train_y_mean:.3f}, std={train_y_std:.3f}")
+    plot_histogram(train_x, f"hist of train_x (mean={train_x_mean:.3f}, std={train_x_std:.3f})")
+    plot_histogram(train_y, f"hist of train_y (mean={train_y_mean:.3f}, std={train_y_std:.3f})")
 
 
 if __name__ == "__main__":
