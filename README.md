@@ -1,4 +1,4 @@
-test test
+test test test
 # Low dimensional MNIST Dataset
 
 When I conduct experiments with custom neural models or alternative training rules, I usually use lightweight datasets such as MNIST, CIFAR or IRIS. But sometimes I am afraid that my experimental models don't work well enough not because they are bad, but because of extra difficulties of the toy tasks. For example MNIST has a significant dimensionality reduction (from 784 to 10). Another difficulty of the MNIST dataset is different input-output data structure and distribution (input is dense black and white pixels and output is a sparse one-hot vector).
