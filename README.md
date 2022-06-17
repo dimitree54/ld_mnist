@@ -109,7 +109,7 @@ There is an example neural network which learns this mapping function between la
 ## Benchmark
 This dataset is intended to train mapping from an input real vector to an output real vector, so it is a regression task, not classification. So I suppose MSE of X to Y mapping can be used as the main quality metric. As additional metric (not for comparison, just for fun) we can use classification accuracy of “Image VAE Encoder -> Test Model -> Class VAE decoder”, but in that case we need to use original dataset labels (note that samples in ld_mnist are provided in the same order as original MNIST from `tf.keras.datasets.mnist.load_data()`). `eval.evaluate()` function calculates these scores for your model.
 
-To submit your result (that you got on the dataset provided with the download link) email me your score (MSE, reconstructed accuracy), repository with your model and short description. My email is dimitree54@gmail.com.
+To submit your result (that you got on the dataset provided with the download link) email me your score (MSE, reconstructed accuracy), repository with your model and short description. My email is dimitree54@gmail.com. Or add row to that table and create pull request.
 
 link to model | short description | MSE | reconstructed accuracy
 :-------------|------------------:|:---------------|----------:
